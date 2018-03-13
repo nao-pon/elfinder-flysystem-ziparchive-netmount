@@ -1,0 +1,25 @@
+{
+    "name": "nao-pon/elfinder-flysystem-ziparchive-netmount",
+    "description": "A Flysystem ZipArchive NetMount Driver for elFinder",
+    "license": "MIT",
+    "keywords": ["elfinder", "flysystem", "filesystem", "zip"],
+    "authors": [
+        {
+            "name": "Naoki Sawada",
+            "email": "hypweb@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.4",
+        "league/flysystem-ziparchive": "^1.0",
+        "barryvdh/elfinder-flysystem-driver": "^0.2.1"
+    },
+    "autoload": {
+         "classmap": [
+             "elFinderFlysystemZipArchiveNetmount.php"
+         ],
+         "psr-4": {
+            "Hypweb\\Flysystem\\ZipArchive\\": "src/"
+        }
+    }
+}

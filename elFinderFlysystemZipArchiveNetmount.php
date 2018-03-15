@@ -109,6 +109,21 @@ class elFinderVolumeFlysystemZipArchiveNetmount extends Driver
     }
 
     /**
+     * Post-process of netmount
+     * Call from elFinder::netmout() after volume->mount()
+     *
+     * @param $options
+     * @return void
+     * @author Naoki Sawada
+     */
+    public function postNetmount(&$options) {
+        // Set md5 hash to detect changes
+        if (isset($options['localpath']) && is_file($options['localpath'])) {
+            $options['md5'] = md5_file($options['localpath']);
+        }
+    }
+
+    /**
      * @inheritdoc
      */
     public function netunmount($netVolumes, $key)
@@ -119,7 +134,9 @@ class elFinderVolumeFlysystemZipArchiveNetmount extends Driver
             $srcVolume = elFinder::$instance->getVolume($this->options['host']);
         }
         if ($srcVolume && file_exists($this->options['localpath'])) {
-            $srcVolume->putContents($this->options['host'], file_get_contents($this->options['localpath']));
+            if (empty($this->options['md5']) || $this->options['md5'] !== md5_file($this->options['localpath'])) {
+                $srcVolume->putContents($this->options['host'], file_get_contents($this->options['localpath']));
+            }
             unlink($this->options['localpath']);
         }
         if ($tmbs = glob($this->tmbPath . DIRECTORY_SEPARATOR . $this->netMountKey . '*')) {

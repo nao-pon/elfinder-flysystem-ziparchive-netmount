@@ -15,7 +15,8 @@ class elFinderVolumeFlysystemZipArchiveNetmount extends Driver
         
         $opts = array(
             'acceptedName' => '#^[^/\\?*:|"<>]*[^./\\?*:|"<>]$#',
-            'rootCssClass' => 'elfinder-navbar-root-zip'
+            'rootCssClass' => 'elfinder-navbar-root-zip',
+            'extractMaxSize' => elFinder::getIniBytes('memory_limit') - memory_get_usage(true) - 2097152
         );
 
         $this->options = array_merge($this->options, $opts);
@@ -93,6 +94,7 @@ class elFinderVolumeFlysystemZipArchiveNetmount extends Driver
                         'timeOut' => $toastTime
                     );
                 }
+                $this->checkExtractSize($path);
                 $options['localpath'] = $path;
                 $options['alias'] = $file['name'];
                 $options['phash'] = $options['path'];
@@ -102,7 +104,7 @@ class elFinderVolumeFlysystemZipArchiveNetmount extends Driver
                 throw new Exception('Target file is not readable or writable or not the Zip Archive.');
             }
         } catch(Exception $e) {
-            return array('exit' => true, 'error' => $e->getMessage());
+            return array('exit' => true, 'error' => array(elFinder::ERROR_NETMOUNT,  $file['name'], $e->getMessage()));
         }
 
         return $options;
@@ -175,6 +177,7 @@ class elFinderVolumeFlysystemZipArchiveNetmount extends Driver
                     throw new Exception(elFinder::ERROR_FILE_NOT_FOUND);
                 }
             }
+            $this->checkExtractSize($opts['localpath']);
             $opts['driver'] = 'Flysystem';
             $opts['filesystem'] = new Filesystem(new ZipArchiveAdapter($opts['localpath']));
             $opts['path'] = '/';
@@ -197,4 +200,46 @@ class elFinderVolumeFlysystemZipArchiveNetmount extends Driver
         return $this->netMountKey.substr($stat['hash'], strlen($this->id)).$stat['ts'].'.png';
     }
 
+    /**
+     * Check extract total files
+     *
+     * @param      string     $filepath   The file path
+     *
+     * @throws     Exception
+     */
+    protected function checkExtractSize($filepath) {
+        $maxSize = empty($this->options['extractMaxSize'])? '' : (string)elFinder::getIniBytes('', $this->options['extractMaxSize']);
+        if (!$maxSize && !empty($this->options['maxArcFilesSize'])) {
+            $maxSize = (string)elFinder::getIniBytes('', $this->options['maxArcFilesSize']);
+        }
+        if ($maxSize) {
+            try {
+                $zip = new ZipArchive();
+                if ($zip->open($filepath) === true) {
+                    // Check total file size after extraction
+                    $num = $zip->numFiles;
+                    $size = 0;
+                    $comp = function_exists('bccomp')? 'bccomp' : 'strnatcmp';
+                    for ($i = 0; $i < $num; $i++) {
+                        $stat = $zip->statIndex($i);
+                        $size += $stat['size'];
+                        if (strpos((string)$size, 'E') !== false) {
+                            $zip->close();
+                            // Cannot handle values exceeding PHP_INT_MAX
+                            throw new Exception(elFinder::ERROR_ARC_MAXSIZE);
+                        }
+                        if ($comp($size, $maxSize) > 0) {
+                            $zip->close();
+                            throw new Exception(elFinder::ERROR_ARC_MAXSIZE);
+                        }
+                    }
+                    $zip->close();
+                } else {
+                    throw new Exception(elFinder::ERROR_OPEN);
+                }
+            } catch (Exception $e) {
+                throw $e;
+            }
+        }
+    }
 }
